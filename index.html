@@ -608,37 +608,56 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-// Overlay click/tap — shared handler for both click and touch
-function handleOverlayTap(e) {
-  e.preventDefault();
-  e.stopPropagation();
+// Start game from any interaction
+function startGameFromOverlay() {
   initAudio();
   if (state === 'start') {
     initGame();
     state = 'playing';
     overlay.classList.add('hidden');
+    return true;
   } else if (state === 'gameover') {
     initGame();
     state = 'playing';
     overlay.classList.add('hidden');
+    return true;
   } else if (state === 'paused') {
-    state = 'playing';
-    overlay.classList.add('hidden');
-  }
-}
-overlay.addEventListener('click', handleOverlayTap);
-overlay.addEventListener('touchend', handleOverlayTap, { passive: false });
-
-// Helper to start game from any touch if not playing
-function tryStartFromTouch() {
-  initAudio();
-  if (state === 'start' || state === 'gameover') {
-    initGame();
     state = 'playing';
     overlay.classList.add('hidden');
     return true;
   }
   return false;
+}
+
+// Overlay: listen for ALL touch/pointer/click events
+overlay.addEventListener('touchstart', e => {
+  e.preventDefault();
+  e.stopPropagation();
+  startGameFromOverlay();
+}, { passive: false });
+overlay.addEventListener('touchend', e => {
+  e.preventDefault();
+  e.stopPropagation();
+}, { passive: false });
+overlay.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  startGameFromOverlay();
+});
+overlay.addEventListener('click', e => {
+  e.preventDefault();
+  startGameFromOverlay();
+});
+
+// Document-level fallback — catches taps that miss the overlay
+document.addEventListener('touchstart', e => {
+  if (state === 'start' || state === 'gameover' || state === 'paused') {
+    startGameFromOverlay();
+  }
+}, { passive: true });
+
+// Helper to start game from any touch if not playing
+function tryStartFromTouch() {
+  return startGameFromOverlay();
 }
 
 // Mobile controls
