@@ -608,8 +608,10 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
 
-// Overlay click/tap
-overlay.addEventListener('click', () => {
+// Overlay click/tap — shared handler for both click and touch
+function handleOverlayTap(e) {
+  e.preventDefault();
+  e.stopPropagation();
   initAudio();
   if (state === 'start') {
     initGame();
@@ -623,13 +625,31 @@ overlay.addEventListener('click', () => {
     state = 'playing';
     overlay.classList.add('hidden');
   }
-});
-overlay.addEventListener('touchend', e => { e.preventDefault(); }, { passive: false });
+}
+overlay.addEventListener('click', handleOverlayTap);
+overlay.addEventListener('touchend', handleOverlayTap, { passive: false });
+
+// Helper to start game from any touch if not playing
+function tryStartFromTouch() {
+  initAudio();
+  if (state === 'start' || state === 'gameover') {
+    initGame();
+    state = 'playing';
+    overlay.classList.add('hidden');
+    return true;
+  }
+  return false;
+}
 
 // Mobile controls
 function setupMobileBtn(id, onDown, onUp) {
   const btn = document.getElementById(id);
-  const start = e => { e.preventDefault(); initAudio(); onDown(); btn.classList.add('active'); };
+  const start = e => {
+    e.preventDefault();
+    if (tryStartFromTouch()) return;
+    onDown();
+    btn.classList.add('active');
+  };
   const end = e => { e.preventDefault(); onUp(); btn.classList.remove('active'); };
   btn.addEventListener('touchstart', start, { passive: false });
   btn.addEventListener('touchend', end, { passive: false });
@@ -642,6 +662,35 @@ function setupMobileBtn(id, onDown, onUp) {
 setupMobileBtn('btnLeft', () => { mobileLeft = true; }, () => { mobileLeft = false; });
 setupMobileBtn('btnRight', () => { mobileRight = true; }, () => { mobileRight = false; });
 setupMobileBtn('btnFire', () => { mobileFire = true; }, () => { mobileFire = false; });
+
+// Canvas touch — tap to fire, swipe left/right to move
+let touchStartX = null;
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (tryStartFromTouch()) return;
+  if (state !== 'playing') return;
+  const touch = e.touches[0];
+  touchStartX = touch.clientX;
+  mobileFire = true;
+  setTimeout(() => { mobileFire = false; }, 100);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (state !== 'playing' || touchStartX === null) return;
+  const touch = e.touches[0];
+  const dx = touch.clientX - touchStartX;
+  const threshold = 10;
+  mobileLeft = dx < -threshold;
+  mobileRight = dx > threshold;
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  touchStartX = null;
+  mobileLeft = false;
+  mobileRight = false;
+}, { passive: false });
 
 // ===== OVERLAYS =====
 function showGameOver() {
